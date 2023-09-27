@@ -100,13 +100,84 @@ You should install/configure the following tools:
 
 ### 1.1 Create a new Domain and Domain controller to support NTLM and Kerberoes authentication
 
+Download Windows 2022 ISO file to install a new Windows VM in Hyper-V
+Download link: https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022
 
-Download ISO - https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022
-Create VM in Hyper-V
-Rename the VM
-Create Domain
-Setup DNS
+Create VM in Hyper-V for Active directory Domain Controller using the PowerShell script bellow:
 
+```powershell
+# Create a Hyper-V VM for Active directory Domain Controller
+mkdir V:\DC
+New-VHD -Path V:\DC\DC.vhdx -SizeBytes 128GB -Dynamic
+New-VM -Name DC -MemoryStartupBytes 8GB -Path V:\DC
+Add-VMHardDiskDrive -VMName DC -Path V:\DC\DC.vhdx
+# Replace the path to the Downloaded ISO image from the previous step
+Set-VMDvdDrive -VMName DC2 -ControllerNumber 0 -Path .\en-us_windows_server_2022_updated_aug_2023_x64_dvd_78639bda.iso
+```
+
+From the Hyper-V management console, double click the DC VM created, click Start and Press Enter to start Windows Installation. Follow the Windows installation Wizard.
+
+Select the following options in the Wizard:
+
+- Windows Product Key - I don't have a Key
+- Select Operating System - Windows Server 2022 Datacenter (Desktop Experience)
+- Custom Install
+- Where to Install - Select the drive and click Next
+- Wait until the installation has finished
+- Define the Administrator password
+
+Define a Static IPaddress for the VM
+
+```powershell
+# Define a Static IPaddress for the VM
+New-NetIPAddress -InterfaceAlias "Ethernet" -IPAddress "192.168.254.252" -PrefixLength 16 -DefaultGateway 192.168.0.1
+```
+
+Rename the VM DC
+
+```powershell
+# Rename the computer - It will cause the Server to restart
+Rename-Computer -NewName DC -Force -Restart
+```
+
+Promote the VM as a new Domain Controller in a new Forest
+
+```powershell
+# Install AD-Domain-Services
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
+# Define the SafeMod Admin Password
+$Password = Read-Host -Prompt   'Enter SafeMode Admin Password' -AsSecureString
+
+# Define the forest/domain parameters
+$Params = @{
+CreateDnsDelegation = $false
+ForestMode = 'WinThreshold'
+DomainMode = 'WinThreshold'
+DomainName = 'akshci.local'
+DomainNetbiosName = 'AKSHCI'
+InstallDns = $true
+DatabasePath = 'C:\Windows\NTDS'
+LogPath = 'C:\Windows\NTDS'
+NoRebootOnCompletion = $true
+SafeModeAdministratorPassword = $Password
+SysvolPath = 'C:\Windows\SYSVOL'
+Force = $true
+}
+# Create a new ADDS Forest
+Install-ADDSForest @Params
+Restart-Computer
+```
+
+Setup a conditional forwarder DNS in the Hyper-V Host for the new Domain
+
+```powershell
+# Setup a conditional forwarder DNS in the Hyper-V Host for the new Domain
+Add-DnsServerConditionalForwarderZone -Name "akshci.local" -MasterServers "192.168.254.252" -PassThru
+
+# Test if you are able to reach the new domain controller using the DNS name
+ping dc.akshci.local
+```
 ## 1. Setting up AKS Hybrid cluster
 
 AKS Hybrid cluster has two main components the Management cluster and the Workload clusters. The Management cluster (also known as the AKS host) provides the core orchestration mechanism and interface for deploying and managing one or more workload clusters. In this step you will initialize the AKS Hybrid which will create the Management cluster (KVA).
@@ -259,6 +330,8 @@ kubectl get svc --all-namespaces --sort-by=.metadata.name
 ```
 
 ## 1. Setting up Azure Arc-enabled SQL Managed Instance
+
+
 
 ## 1. Deploy .Net App that use NTLM authentication
 
