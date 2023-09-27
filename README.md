@@ -96,6 +96,17 @@ You should install/configure the following tools:
 
 **WARNING: Do not install PowerShell 7.0**
 
+## 1. Creating an Active Directory domain
+
+### 1.1 Create a new Domain and Domain controller to support NTLM and Kerberoes authentication
+
+
+Download ISO - https://www.microsoft.com/en-us/evalcenter/evaluate-windows-server-2022
+Create VM in Hyper-V
+Rename the VM
+Create Domain
+Setup DNS
+
 ## 1. Setting up AKS Hybrid cluster
 
 AKS Hybrid cluster has two main components the Management cluster and the Workload clusters. The Management cluster (also known as the AKS host) provides the core orchestration mechanism and interface for deploying and managing one or more workload clusters. In this step you will initialize the AKS Hybrid which will create the Management cluster (KVA).
@@ -158,7 +169,7 @@ Install-AksHci
 
 After executing this script the AKS Hybrid will be installed but no workload cluster was created yet.
 
-## 1. Create AKS Hybrid Workload Cluster
+### 1. Create AKS Hybrid Workload Cluster
 
 In this step you will create the AKS Hybrid Workload Cluster. This is the cluster where your application is deployed. In this step you are defining the network where the AKS Hybrid Workload Cluster will reside and the settings for the controlPlanceNode and nodePool, at the end you are connecting this AKS Hybrid Workload Cluster to Azure Arc-enabled Kubernetes.
 
@@ -187,7 +198,7 @@ Set-AzContext -Subscription $subscriptionId
 Enable-AksHciArcConnection -name $workloadClusterName
 ```
 
-## Deploy Windows Node Pool for the .Net application
+### Deploy Windows Node Pool for the .Net application
 
 In this step you will create a Windows nodePool to host the .Net WebApplication. This nodePool will be running Windows 2022 operating system which is a requirement for legacy applications that still depends on Windows libraries such as .Net Framework 4.X.
 
@@ -200,7 +211,7 @@ $workloadClusterName="wld01-cluster"
 New-AksHciNodePool -clusterName $workloadClusterName -name windowsnodepool -count 1 -osType windows -OsSku Windows2022
 ```
 
-## Deploy Linux Node Pool for SQL Managed Instance
+### Deploy Linux Node Pool for SQL Managed Instance
 
 In this step you will create a Linux nodePool named dblinux to host the Azure Arc-enabled SQL Managed Instance. This nodePool will requires a VMSize of Standard_D4s_v3. This 
 
@@ -213,7 +224,39 @@ $workloadClusterName="wld01-cluster"
 New-AksHciNodePool -clusterName $workloadClusterName -name dblinux -count 1 -osType Linux -VMSize Standard_D4s_v3
 ```
 
-## 1. Connecting and managing the AKS Hybrid Workload Cluster
+### 1. Connecting and managing the AKS Hybrid Workload Cluster
+
+Here is the steps to connect to an AKS Hybrid Workload Cluster and a few kubectl commands as example. It's important to check the cluster accessibility at this point prior to move forward.
+
+```powershell
+# Variables used in this script
+$workloadClusterName="wld01-cluster"
+
+# Get credentials for the cluster
+Get-AksHciCredential -name $workloadClusterName -Confirm:$false
+# The credentials are stored in the kubeconfig file in the user's home directory
+dir $env:USERPROFILE\.kube
+
+### Working with kubectl
+# If you want to familiarize yourself with kubect, see the following cheatsheet
+# https://kubernetes.io/docs/reference/kubectl/cheatsheet/
+# Here are some examples
+
+# View all the resources in the cluster
+kubectl get all
+
+# View the application
+kubectl get nodes
+
+# View all namespaces
+kubectl get ns
+
+# View all pods in all namespaces
+kubectl get pods --all-namespaces
+
+# View services running in all namespaces
+kubectl get svc --all-namespaces --sort-by=.metadata.name
+```
 
 ## 1. Setting up Azure Arc-enabled SQL Managed Instance
 
